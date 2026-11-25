@@ -1,0 +1,12 @@
+node_modules/
+.pnpm-store/
+dist/
+data/
+outputs/
+.env
+.env.*
+!.env.example
+.vercel/
+playwright/.auth/
+*.log
+*.tsbuildinfo

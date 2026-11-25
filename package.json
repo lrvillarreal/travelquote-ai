@@ -1,0 +1,16 @@
+{
+  "name": "travelquote-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "server": "node --experimental-sqlite server/index.mjs",
+    "build": "tsc --noEmit && vite build",
+    "start": "node --experimental-sqlite server/index.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": { "exceljs": "4.4.0", "react": "19.2.0", "react-dom": "19.2.0", "lucide-react": "0.468.0" },
+  "devDependencies": { "@types/react": "19.2.2", "@types/react-dom": "19.2.2", "typescript": "5.9.3", "vite": "7.2.2" }
+}

@@ -1,0 +1,29 @@
+name: Verify application
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Domain and integration tests
+        run: npm test
+      - name: Typecheck and production build
+        run: npm run build
+      - name: Preserve built frontend and lockfile
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: travelquote-frontend
+          path: |
+            dist/
+            package-lock.json
+          retention-days: 7
