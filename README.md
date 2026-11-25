@@ -13,12 +13,18 @@ Aplicación de cotizaciones vacacionales. Primera entrega: flujo funcional de de
 - Los documentos llevan una advertencia de demostración. No son válidos para venta.
 - IA desactivada. No se necesita API key y el código no realiza llamadas a OpenAI.
 
-## Ejecutar en Windows
+## Abrir en Windows con doble clic
+
+Con Node.js 24 LTS instalado, abre `ABRIR_TRAVELQUOTE.cmd`. La primera vez instala las dependencias fijadas en `package-lock.json`, compila la interfaz y abre el navegador cuando el servidor responde. Conserva la ventana abierta durante el uso; Ctrl+C detiene la app. Si aparece un error, la ventana permanece abierta para leerlo.
+
+El arranque comprueba la respuesta local con un limite de 5 segundos. Si el entorno de ejecucion bloquea localhost, ejecuta el archivo directamente en Windows desde la carpeta del proyecto.
+
+## Ejecutar desde PowerShell
 
 Instala Node.js 24 LTS desde su fuente oficial. Desde PowerShell, en la carpeta del proyecto:
 
 ```powershell
-npm.cmd install
+npm.cmd ci --ignore-scripts --no-audit --no-fund
 npm.cmd run dev
 ```
 
@@ -40,7 +46,7 @@ npm.cmd test
 npm.cmd run build
 ```
 
-GitHub Actions verifica la lógica, compila la interfaz y prueba el servidor y la generación de Excel. Guarda el frontend compilado como artefacto de la ejecución. En esta fase la instalación resuelve dependencias transitivas desde npm; debemos fijar un lockfile antes de integrar credenciales reales o publicar una versión operativa.
+GitHub Actions verifica la lógica, compila la interfaz y prueba el servidor y la generación de Excel. Guarda el frontend compilado como artefacto de la ejecución. Las dependencias estan fijadas en package-lock.json; npm ci reproduce esa instalacion en Windows y GitHub Actions.
 
 ## Costos y Vercel
 
