@@ -5,7 +5,6 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { validateTrip, routeProviders, makeDemoOffers, calculateQuote } from '../shared/domain.mjs';
-import { createWorkbook } from './workbook.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = process.env.TRAVELQUOTE_DATA_DIR || path.join(root, 'data');
 await mkdir(dataDir, { recursive: true });
@@ -58,6 +57,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && download) {
       const row = db.prepare('SELECT payload FROM quotes WHERE id = ?').get(download[1]);
       if (!row) return json(res, 404, { error: 'No se encontró la cotización.' });
+      const { createWorkbook } = await import('./workbook.mjs');
       const buffer = await createWorkbook(JSON.parse(row.payload));
       res.writeHead(200, { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="Cotizacion_DEMO_${download[1].slice(0, 8)}.xlsx"`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }); return res.end(buffer);
     }

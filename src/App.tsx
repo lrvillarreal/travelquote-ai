@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowDownToLine, ArrowRight, Building2, CalendarDays, Check, CheckCircle2, ChevronRight, CircleHelp, Clock3, Compass, FileText, History, Leaf, MapPin, Minus, Plane, Plus, Search, Send, Settings2, ShieldCheck, Sparkles, Star, Trash2, Users, Van, X } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, Building2, CalendarDays, CarFront as Van, Check, CheckCircle2, ChevronRight, CircleHelp, Clock3, Compass, FileText, History, Leaf, MapPin, Minus, Plane, Plus, Search, Send, Settings2, ShieldCheck, Sparkles, Star, Trash2, Users, X } from 'lucide-react';
 import { DESTINATIONS, nightsBetween, travelerCounts, routeProviders } from '../shared/domain.mjs';
 
 type Service = 'hotel' | 'transfer' | 'flight';
