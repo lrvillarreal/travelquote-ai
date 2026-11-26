@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
-import { getTransferTimeButtons, describeTransferFailure, readCancellationTooltip } from '../server/providers/rv-pilot.mjs';
+import { getTransferTimeButtons, describeTransferFailure } from '../server/providers/rv-pilot.mjs';
 
 // Synthetic control inventory reproduces the portal's desktop/mobile pairs.
 // No supplier account data, session IDs or prices are used.
@@ -54,16 +54,6 @@ test('transfer control count diagnostic includes only a safe numeric count', () 
   assert.equal(diagnostic.code, 'TIME_CONTROL_COUNT');
   assert.equal(diagnostic.controlCount, 0);
   assert.doesNotMatch(JSON.stringify(diagnostic), /private supplier text/);
-});
-
-test('cancellation keeps the validated tooltip snapshot if it disappears on the next read', async () => {
-  let reads = 0;
-  const page = { getByRole: role => {
-    assert.equal(role, 'tooltip');
-    return { allTextContents: async () => ++reads === 1 ? ['Unrelated hint', 'Cancelling from 01/12/2027: example penalty'] : [] };
-  } };
-  assert.equal(await readCancellationTooltip(page), 'Cancelling from 01/12/2027: example penalty');
-  assert.equal(reads, 1);
 });
 
 test('real browser resolves time controls relative to the Transfers panel', async t => {

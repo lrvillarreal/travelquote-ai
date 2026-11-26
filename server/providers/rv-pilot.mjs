@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import { RV_ORIGIN, asPortalDate, verifySearchHeading, normalizeHotels, normalizeTransfers, validatePilotRequest } from './rv-normalize.mjs';
 import { hasRvSession, waitForRvSession } from './rv-session.mjs';
+import { captureHotelCancellation } from './rv-cancellation.mjs';
 
 const exact = name => ({ name, exact: true });
 const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -99,18 +100,6 @@ export function describeTransferFailure(stage, error) {
   return diagnostic;
 }
 
-export async function readCancellationTooltip(page) {
-  let cancellation = '';
-  await until(async () => {
-    // Tooltips can disappear between reads. Keep the same snapshot that passed
-    // validation, and exclude unrelated tooltips from this rate's conditions.
-    cancellation = (await page.getByRole('tooltip').allTextContents())
-      .filter(text => /Cancelling from/i.test(text)).join(' ').replace(/\s+/g, ' ').trim();
-    return Boolean(cancellation);
-  }, 15000, 'Política no disponible.');
-  return cancellation;
-}
-
 // Read only rendered result cards. Never extract cookies, credentials, option/cache IDs or full HTML.
 export async function readHotelRows(page) {
   return page.locator('article.hotel-result').evaluateAll(cards => cards.flatMap(card => {
@@ -194,14 +183,12 @@ export async function runRvPilot(request, { log = console.log, channel } = {}) {
     if (request.hotelName) rows = rows.filter(row=>row.hotelName.toLowerCase().includes(request.hotelName.toLowerCase()));
     if (!rows.length) throw new Error('No se encontraron tarifas legibles para el hotel solicitado.');
     const firstCard = page.locator('article.hotel-result').filter({ has: page.getByRole('heading', { name: new RegExp(escapeRegex(rows[0].hotelName), 'i') }) }).first();
-    const condition = firstCard.locator('.result-option').first().getByText(/^Check Conditions$/i).first();
-    if (await condition.count()) {
-      await clickReadOnly(condition);
-      try {
-        rows[0].cancellation = await readCancellationTooltip(page);
-        log('Política de cancelación capturada únicamente para la primera tarifa hotelera.');
-      } catch { log('No se recibió la política de cancelación de la primera tarifa; queda pendiente de revisar.'); }
-    } else { log('La primera tarifa no muestra el control Check Conditions; la política de cancelación queda pendiente.'); }
+    const cancellation = await captureHotelCancellation(firstCard.locator('.result-option').first(), rows[0]);
+    rows[0].cancellation = cancellation.cancellation;
+    rows[0].cancellationPendingReason = cancellation.reason;
+    rows[0].cancellationAssociation = cancellation.association;
+    if (cancellation.status === 'captured') log('Política vinculada a la primera tarifa hotelera capturada; las demás siguen pendientes.');
+    else log(`Política de cancelación de la primera tarifa pendiente [${cancellation.reason}]; no se atribuyeron avisos de otras tarifas.`);
     const hotels = normalizeHotels(rows, request);
     if (!hotels.offers.length) throw new Error('Todas las tarifas hoteleras fueron rechazadas por los controles de consistencia.');
     log(`Hoteles: ${hotels.offers.length} tarifas capturadas; ${hotels.rejected.length} descartadas.`);

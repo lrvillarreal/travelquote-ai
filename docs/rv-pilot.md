@@ -70,13 +70,25 @@ PROBAR_RV_ONLINE.cmd --request "data\mi-prueba.json"
 
 El 26 de noviembre de 2026 se ejecutó `npm.cmd run rv:pilot` desde CMD con Node.js 26.12.0, Playwright 1.65.1 y Edge instalado (Chrome no estaba instalado). Después del inicio de sesión manual, la ejecución terminó con código 0: dos tarifas hoteleras y doce opciones de traslado, sin descartes, errores ni diagnósticos. Se confirmaron ambos selectores de hora y se validó el encabezado del proveedor con ruta, fechas y ocupación antes de normalizar los resultados. No se reservaron productos ni se usó el carrito. Los resultados quedaron únicamente en `data/rv-pilot/`, excluida de Git.
 
-Los resultados incluyeron horarios por determinar y horarios distintos del solicitado; se conservaron las advertencias correspondientes. La primera ejecución completa no capturó políticas de cancelación: sus valores permanecieron vacíos, sin inferir que las tarifas fueran reembolsables. La lectura del control acepta ahora diferencias de mayúsculas y avisa si no lo encuentra. También conserva el texto en la misma lectura que comprueba su contenido, evitando perderlo si el tooltip desaparece. La ejecución final volvió a completar hotel y traslados con código 0, pero no recibió el texto esperado de cancelación en 15 segundos y mostró el aviso correspondiente. La política sigue pendiente de comprobación; no se confirmó la causa de su ausencia en el portal. El piloto solo intenta consultar la primera tarifa, no las restantes ni los traslados.
+Los resultados incluyeron horarios por determinar y horarios distintos del solicitado; se conservaron las advertencias correspondientes. La base validada se conservó en el commit `db16462` del PR #2. La interfaz continúa en modo demo.
 
-Las 23 pruebas automatizadas pasaron, incluida la regresión ejecutada con Edge real sobre HTML sintético y la conservación de una política cuyo tooltip desaparece en la lectura siguiente. Esta evidencia complementa la ejecución autenticada; las pruebas por sí solas no validan al proveedor.
+### Cancelación aislada
+
+`server/providers/rv-cancellation.mjs` consulta únicamente el control `.js-condition-policy` de la primera tarifa capturada. Antes y después valida hotel, código público de hotel, habitación, alimentos, ocupación, importe exacto y moneda. Conserva una referencia a esa fila del DOM: si se reemplaza, no continúa con la fila que ocupe su lugar. Solo acepta un aviso contenido en el control o vinculado mediante `aria-describedby`/`aria-controls`; rechaza referencias compartidas, varios avisos y políticas globales sin asociación. Los identificadores de los tooltips se usan en memoria y no se exportan.
+
+El resultado distingue `cancellationStatus: captured` de `pending`; este último incluye un motivo seguro y conserva la advertencia. Una marca de no reembolsable no equivale a haber obtenido la política completa. Las restantes tarifas siguen pendientes y no heredan el aviso de la primera.
+
+La ejecución autenticada final en Edge completó dos tarifas hoteleras y doce traslados con código 0. La cancelación quedó pendiente con `rate-changed`: la fila fue reemplazada durante la consulta. No se guardó ningún aviso como política de esa tarifa. Pasaron las 31 pruebas, incluidas regresiones con Edge real sobre HTML sintético para cambios de fila, reordenamientos, políticas ajenas y asociaciones ambiguas. También pasó el build de producción. Esta evidencia complementa la ejecución autenticada; las pruebas por sí solas no validan al proveedor.
+
+### Cotejo local de tarifas
+
+Se cotejó una tarifa hotelera y una de traslado mediante lecturas separadas del portal y sus resultados normalizados: importe exacto del conversor (`data-amount`), MXN, ocupación, fechas del encabezado y habitación/plan del hotel. También se comprobó que las etiquetas visibles en MXN coinciden con esos importes redondeados a pesos enteros. En el traslado se cotejaron ambos trayectos de la misma tarjeta y el mismo importe mostrado en sus dos vistas, conservado una sola vez como total redondo para la ocupación indicada. No se multiplicó por pasajeros ni por trayectos. Los horarios de esa opción estaban por determinar.
+
+El cotejo conserva sus detalles exclusivamente en `data/rv-pilot/`, ignorada por Git. No se incluyen tarifas de cuenta, HTML, resultados ni identificadores de sesión en el repositorio. Los centavos provienen del conversor del portal; una etiqueta redondeada no demuestra por sí sola el importe exacto. Este cotejo no constituye revalidación para venta ni confirma cargos posteriores, comisión o condiciones contractuales.
 
 ## Límite de esta entrega
 
-El piloto aún no activa precios reales en la interfaz ni genera cotizaciones para clientes. Captura una muestra de tarifas visibles del hotel solicitado, sin recorrer todo el inventario ni todas las páginas. Falta cotejar los importes y condiciones, completar las políticas de cancelación, confirmar si algún hotel incluye traslados, definir precios/comisiones de la cuenta y validar la relación de horarios con vuelos. Después se integrará el resultado normalizado al cotizador y su exportación Excel.
+El piloto aún no activa precios reales en la interfaz ni genera cotizaciones para clientes. Captura una muestra de tarifas visibles del hotel solicitado, sin recorrer todo el inventario ni todas las páginas. El cotejo cubre una tarifa de cada servicio. Falta revalidar precios y condiciones para venta, completar las políticas de cancelación, confirmar si algún hotel incluye traslados, definir precios/comisiones de la cuenta y validar la relación de horarios con vuelos. Después se integrará el resultado normalizado al cotizador y su exportación Excel.
 
 Referencias públicas consultadas:
 

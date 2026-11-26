@@ -37,6 +37,7 @@ test('hotel capture removes duplicates and private fields without inferring miss
   assert.equal(result.offers.length,1);
   const offer=result.offers[0];
   assert.equal(offer.priceCents,1234567);assert.equal(offer.cancellation,null);
+  assert.equal(offer.cancellationStatus,'pending');assert.equal(offer.cancellationPendingReason,'not-queried');
   assert.equal(offer.requiresManualReview,true);assert.equal(offer.includesTransfer,'unknown');
   assert.equal(offer.consultedAt,'2029-01-01T00:00:00Z');
   for(const field of ['cookies','optionId','rawHtml'])assert.equal(field in offer,false);
@@ -49,6 +50,17 @@ test('hotel capture rejects wrong nights, occupancy, board, currency and adult-o
   assert.equal(result.offers.length,0);assert.equal(result.rejected.length,invalid.length);
   const nonRefundable=normalizeHotels([{...hotel(),nonRefundable:true}],r).offers[0];
   assert.match(nonRefundable.cancellation,/no reembolsable/);
+  assert.equal(nonRefundable.cancellationStatus,'pending');
+});
+
+test('hotel policy metadata remains attached to its rate and other rates stay pending', () => {
+  const rows=[{...hotel(),cancellation:'Cancelling from a synthetic date: penalty A',cancellationAssociation:'control-reference'}, {...hotel(),amount:'12346.67',cancellationPendingReason:'rate-changed'}];
+  const [first,second]=normalizeHotels(rows,request()).offers;
+  assert.equal(first.cancellationStatus,'captured');
+  assert.equal(first.cancellationAssociation,'control-reference');
+  assert.equal(second.cancellationStatus,'pending');
+  assert.equal(second.cancellationPendingReason,'rate-changed');
+  assert.equal(second.cancellation,null);
 });
 
 test('transfer capture preserves mixed legs, exact roundtrip total and actual return time', () => {

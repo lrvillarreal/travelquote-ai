@@ -92,8 +92,13 @@ export function normalizeHotels(rows, request, consultedAt = new Date().toISOStr
     if (request.trip.meal === 'breakfast' && !/breakfast|desayuno/i.test(row.meal)) throw new Error('No coincide el desayuno solicitado.');
     const offer = { ...base(row, request, 'hotel', consultedAt), title: clean(row.hotelName), hotelCode: row.hotelCode, roomName: clean(row.roomName), meal: clean(row.meal), includesTransfer: 'unknown' };
     offer.nonRefundable = row.nonRefundable === true;
+    offer.cancellationStatus = offer.cancellation ? 'captured' : 'pending';
+    if (offer.cancellationStatus === 'pending') {
+      const reasons = ['rate-unavailable', 'rate-changed', 'control-unavailable', 'notice-already-open', 'notice-ambiguous', 'notice-unavailable', 'control-failed'];
+      offer.cancellationPendingReason = reasons.includes(row.cancellationPendingReason) ? row.cancellationPendingReason : 'not-queried';
+    } else if (['control-reference', 'control-descendant'].includes(row.cancellationAssociation)) offer.cancellationAssociation = row.cancellationAssociation;
     if (offer.nonRefundable && !offer.cancellation) offer.cancellation = 'El portal marca esta tarifa como no reembolsable; consultar la política completa.';
-    if (!offer.cancellation) offer.warnings.push('Política de cancelación pendiente de consultar para esta tarifa.');
+    if (offer.cancellationStatus === 'pending') offer.warnings.push('Política de cancelación pendiente de consultar para esta tarifa.');
     offer.warnings.push('No se ha confirmado si el hotel incluye traslados.');
     return offer;
   });
