@@ -60,15 +60,23 @@ PROBAR_RV_ONLINE.cmd --request "data\mi-prueba.json"
 - La lista puede mostrar importes redondeados. El conversor de moneda de cada tarifa expone el importe exacto; el piloto conserva sus centavos y rechaza importes ambiguos o monedas diferentes.
 - Cada habitación y plan tiene su tarifa y política. Consultar una política no valida el resto de opciones.
 - El formulario de traslados exige confirmar los dos selectores de hora. Puede devolver un horario diferente al solicitado o pendiente de determinar.
-- Cada horario tiene un botón para computadora y una copia oculta para móvil. El piloto selecciona solo los dos botones visibles y comprueba su cantidad antes de continuar. Esta corrección se cotejó en el navegador compartido con una consulta que devolvió opciones; falta confirmar la ejecución completa del programa actualizado en Windows.
-- CMD muestra cada paso de traslados. Ante un fallo, el JSON conserva `diagnostics` con el paso y una clasificación segura (`TIMEOUT` o `STEP_FAILED`), sin mensajes internos, URLs de sesión ni trazas del navegador. La ventana distingue una consulta parcial de un fallo total.
+- Cada horario tiene un botón para computadora y una copia oculta para móvil. El piloto selecciona solo los dos botones visibles y comprueba su cantidad antes de continuar. En Windows se reprodujo otro fallo: `filter({ has: panel.locator(...) })` busca el panel dentro de cada botón y devuelve cero controles. La excepción local era «No se encontraron exactamente dos selectores de hora visibles». Se corrigió con `button:has(input.hour-selector-text)` dentro del panel, conservando el filtro de visibilidad. Una prueba con Edge real y HTML sintético reproduce el selector anterior y valida la corrección sin datos de cuenta.
+- CMD muestra cada paso de traslados. Ante un fallo, el JSON conserva `diagnostics` con el paso y una clasificación segura (`TIMEOUT`, `STEP_FAILED` o `TIME_CONTROL_COUNT`); esta última incluye únicamente la cantidad numérica de controles. No guarda mensajes internos, URLs de sesión ni trazas del navegador. La ventana distingue una consulta parcial de un fallo total.
 - Una opción redonda puede combinar compartido y privado. El importe es por todos los pasajeros y ambos trayectos; no se duplica.
 - Hay productos cuyo nombre indica 18+ aunque la búsqueda incluya menores. El piloto los descarta; otras restricciones requieren revisión humana.
 - Existe exportación nativa de hoteles en PDF, abierta en otra pestaña. No es un endpoint de disponibilidad.
 
+## Comprobación local en Windows
+
+El 26 de noviembre de 2026 se ejecutó `npm.cmd run rv:pilot` desde CMD con Node.js 26.12.0, Playwright 1.65.1 y Edge instalado (Chrome no estaba instalado). Después del inicio de sesión manual, la ejecución terminó con código 0: dos tarifas hoteleras y doce opciones de traslado, sin descartes, errores ni diagnósticos. Se confirmaron ambos selectores de hora y se validó el encabezado del proveedor con ruta, fechas y ocupación antes de normalizar los resultados. No se reservaron productos ni se usó el carrito. Los resultados quedaron únicamente en `data/rv-pilot/`, excluida de Git.
+
+Los resultados incluyeron horarios por determinar y horarios distintos del solicitado; se conservaron las advertencias correspondientes. La primera ejecución completa no capturó políticas de cancelación: sus valores permanecieron vacíos, sin inferir que las tarifas fueran reembolsables. La lectura del control acepta ahora diferencias de mayúsculas y avisa si no lo encuentra. También conserva el texto en la misma lectura que comprueba su contenido, evitando perderlo si el tooltip desaparece. La ejecución final volvió a completar hotel y traslados con código 0, pero no recibió el texto esperado de cancelación en 15 segundos y mostró el aviso correspondiente. La política sigue pendiente de comprobación; no se confirmó la causa de su ausencia en el portal. El piloto solo intenta consultar la primera tarifa, no las restantes ni los traslados.
+
+Las 23 pruebas automatizadas pasaron, incluida la regresión ejecutada con Edge real sobre HTML sintético y la conservación de una política cuyo tooltip desaparece en la lectura siguiente. Esta evidencia complementa la ejecución autenticada; las pruebas por sí solas no validan al proveedor.
+
 ## Límite de esta entrega
 
-El piloto aún no activa precios reales en la interfaz ni genera cotizaciones para clientes. Captura una muestra de tarifas visibles del hotel solicitado, sin recorrer todo el inventario ni todas las páginas. Falta ejecutar este programa en Windows, cotejar los importes y condiciones, confirmar si algún hotel incluye traslados, definir precios/comisiones de la cuenta y validar la relación de horarios con vuelos. Después se integrará el resultado normalizado al cotizador y su exportación Excel.
+El piloto aún no activa precios reales en la interfaz ni genera cotizaciones para clientes. Captura una muestra de tarifas visibles del hotel solicitado, sin recorrer todo el inventario ni todas las páginas. Falta cotejar los importes y condiciones, completar las políticas de cancelación, confirmar si algún hotel incluye traslados, definir precios/comisiones de la cuenta y validar la relación de horarios con vuelos. Después se integrará el resultado normalizado al cotizador y su exportación Excel.
 
 Referencias públicas consultadas:
 

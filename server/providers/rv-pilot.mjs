@@ -76,17 +76,39 @@ async function setTime(page, button, value) {
 export async function getTransferTimeButtons(panel) {
   // Each journey has a desktop button AND a hidden mobile copy. Index only
   // visible triggers, otherwise index 1 is the hidden outbound mobile button.
-  const buttons = panel.locator('button').filter({ has: panel.locator('input.hour-selector-text') }).filter({ visible: true });
-  if (await buttons.count() !== 2) throw new Error('No se encontraron exactamente dos selectores de hora visibles.');
+  // A has locator is relative to each candidate button. Reusing panel.locator()
+  // there searches for a nested tabpanel inside the button and matches nothing.
+  const buttons = panel.locator('button:has(input.hour-selector-text)').filter({ visible: true });
+  const count = await buttons.count();
+  if (count !== 2) {
+    const error = new Error('No se encontraron exactamente dos selectores de hora visibles.');
+    error.code = 'TIME_CONTROL_COUNT';
+    error.controlCount = count;
+    throw error;
+  }
   return buttons;
 }
 
 export function describeTransferFailure(stage, error) {
   // Playwright messages can contain supplier URLs, IDs and page text. Keep
   // diagnostics useful without storing that raw message, stack or call log.
-  const code = error?.name === 'TimeoutError' ? 'TIMEOUT' : 'STEP_FAILED';
-  const reason = code === 'TIMEOUT' ? 'El control o resultado no estuvo disponible dentro del plazo.' : 'El paso no se completó o no superó la validación.';
-  return { service: 'transfer', stage, code, message: reason };
+  const code = error?.code === 'TIME_CONTROL_COUNT' ? 'TIME_CONTROL_COUNT' : error?.name === 'TimeoutError' ? 'TIMEOUT' : 'STEP_FAILED';
+  const reason = code === 'TIME_CONTROL_COUNT' ? 'Se esperaban exactamente dos selectores de hora visibles.' : code === 'TIMEOUT' ? 'El control o resultado no estuvo disponible dentro del plazo.' : 'El paso no se completó o no superó la validación.';
+  const diagnostic = { service: 'transfer', stage, code, message: reason };
+  if (code === 'TIME_CONTROL_COUNT' && Number.isSafeInteger(error.controlCount) && error.controlCount >= 0) diagnostic.controlCount = error.controlCount;
+  return diagnostic;
+}
+
+export async function readCancellationTooltip(page) {
+  let cancellation = '';
+  await until(async () => {
+    // Tooltips can disappear between reads. Keep the same snapshot that passed
+    // validation, and exclude unrelated tooltips from this rate's conditions.
+    cancellation = (await page.getByRole('tooltip').allTextContents())
+      .filter(text => /Cancelling from/i.test(text)).join(' ').replace(/\s+/g, ' ').trim();
+    return Boolean(cancellation);
+  }, 15000, 'Política no disponible.');
+  return cancellation;
 }
 
 // Read only rendered result cards. Never extract cookies, credentials, option/cache IDs or full HTML.
@@ -172,14 +194,14 @@ export async function runRvPilot(request, { log = console.log, channel } = {}) {
     if (request.hotelName) rows = rows.filter(row=>row.hotelName.toLowerCase().includes(request.hotelName.toLowerCase()));
     if (!rows.length) throw new Error('No se encontraron tarifas legibles para el hotel solicitado.');
     const firstCard = page.locator('article.hotel-result').filter({ has: page.getByRole('heading', { name: new RegExp(escapeRegex(rows[0].hotelName), 'i') }) }).first();
-    const condition = firstCard.locator('.result-option').first().getByText('Check Conditions', { exact: true }).first();
+    const condition = firstCard.locator('.result-option').first().getByText(/^Check Conditions$/i).first();
     if (await condition.count()) {
       await clickReadOnly(condition);
       try {
-        await until(async()=> /Cancelling from/i.test((await page.getByRole('tooltip').allTextContents()).join(' ')), 15000, 'Política no disponible.');
-        rows[0].cancellation = (await page.getByRole('tooltip').allTextContents()).join(' ').replace(/\s+/g,' ').trim();
+        rows[0].cancellation = await readCancellationTooltip(page);
+        log('Política de cancelación capturada únicamente para la primera tarifa hotelera.');
       } catch { log('No se recibió la política de cancelación de la primera tarifa; queda pendiente de revisar.'); }
-    }
+    } else { log('La primera tarifa no muestra el control Check Conditions; la política de cancelación queda pendiente.'); }
     const hotels = normalizeHotels(rows, request);
     if (!hotels.offers.length) throw new Error('Todas las tarifas hoteleras fueron rechazadas por los controles de consistencia.');
     log(`Hoteles: ${hotels.offers.length} tarifas capturadas; ${hotels.rejected.length} descartadas.`);
