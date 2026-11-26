@@ -77,6 +77,14 @@ tests/             Pruebas de lógica e integración
 docs/              Arquitectura, decisiones y fases
 ```
 
+## Piloto de consulta real de RV Online
+
+`PROBAR_RV_ONLINE.cmd` abre un navegador temporal para iniciar sesión y consultar un caso de hotel y traslados en Cancún. Guarda resultados locales para cotejarlos con el portal. La prueba manual del portal ya se realizó; falta validar este programa en Windows. La interfaz de cotizaciones continúa en modo demo. Instrucciones, alcance y límites: [docs/rv-pilot.md](docs/rv-pilot.md).
+
+```bat
+npm.cmd run rv:check
+```
+
 ## Próxima fase
 
 Validar con la agencia la interfaz, sus reglas comerciales y una búsqueda real de hotel y traslados en RV Online. La conexión a Viva Aerobus depende de una evaluación independiente de acceso y automatización. No se realizan reservas, compras ni envíos a clientes.
