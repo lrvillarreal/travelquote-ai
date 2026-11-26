@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import { RV_ORIGIN, asPortalDate, verifySearchHeading, normalizeHotels, normalizeTransfers, validatePilotRequest } from './rv-normalize.mjs';
+import { hasRvSession, waitForRvSession } from './rv-session.mjs';
 
 const exact = name => ({ name, exact: true });
 const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -18,7 +19,7 @@ async function accessible(page) {
   if (new URL(page.url()).origin !== RV_ORIGIN) throw new Error('El navegador salió del dominio autorizado de RV Online.');
   const text = await page.locator('body').innerText();
   if (/access denied|automated (traffic|requests)|verify (that )?you are human|captcha verification failed/i.test(text)) throw new Error('El portal pide verificación o deniega la consulta. El piloto se detuvo sin reintentar.');
-  if (await page.getByRole('link', exact('Log out')).count() === 0) throw new Error('La sesión no está iniciada o venció.');
+  if (!await hasRvSession(page)) throw new Error('La sesión no está iniciada o venció.');
 }
 
 async function clickReadOnly(locator) {
@@ -120,19 +121,25 @@ export async function runRvPilot(request, { log = console.log, channel } = {}) {
     const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 1000 }, acceptDownloads: false });
     // Prevent all booking navigation/requests even if the supplier changes its interface.
     await context.route('**/*', route => /\/(booking|payment|checkout)\//i.test(new URL(route.request().url()).pathname) ? route.abort('blockedbyclient') : route.continue());
-    const page = await context.newPage();
+    let page = await context.newPage();
     page.setDefaultTimeout(12000); page.setDefaultNavigationTimeout(30000);
     await page.goto(RV_ORIGIN, { waitUntil: 'domcontentloaded' });
     log('Inicia sesión directamente en la ventana de RV Online (hasta 5 minutos). No escribas credenciales en CMD.');
-    await page.getByRole('link', exact('Log out')).waitFor({ state: 'visible', timeout: 300000 });
+    page = await waitForRvSession(context, { log });
+    page.setDefaultTimeout(12000); page.setDefaultNavigationTimeout(30000);
     await accessible(page);
+    log('Sesión detectada en la ventana del piloto.');
+    if (!await page.getByRole('tab', exact('Hotels')).isVisible()) throw new Error('El acceso está iniciado, pero el portal no muestra las etiquetas en inglés validadas por el piloto. Comparte una captura del buscador para adaptar el idioma.');
     log('Sesión iniciada. Consultando hoteles...');
     const panel = page.getByRole('tabpanel', exact('Hotels'));
+    log('Hotel: seleccionando Cancún en el catálogo...');
     await chooseDestination(page, panel, 'Destination', 'Cancun', /^\s*Cancun Quintana Roo, Mexico\s*$/);
+    log('Hotel: configurando fechas, nacionalidad y viajeros...');
     await setDate(panel.getByRole('textbox', exact('Check-in More information')), request.trip.start);
     await setDate(panel.getByRole('textbox', exact('Check-out More information')), request.trip.end);
     await chooseEnhanced(page, panel.getByRole('combobox', exact('Nationality')), 'Mexico');
     await setGuests(page, panel.getByRole('button', { name: /\d+ Rooms \d+ Guests/ }), request.trip.rooms[0]);
+    log('Hotel: enviando la consulta y esperando resultados completos...');
     await clickReadOnly(panel.getByRole('button', exact('Search')));
     await page.getByRole('heading', { name: 'Hotels in Cancun, Quintana Roo, Mexico', exact: true }).waitFor();
     await until(async () => {

@@ -18,6 +18,8 @@ El programa solo consulta los controles visibles del portal. No utiliza una API 
 
 Node.js 24 o posterior y Chrome o Edge son necesarios. No requiere PowerShell ni descarga un navegador adicional. El portal debe mostrar las etiquetas en inglés que se validaron en esta fase. Si cambia la interfaz, el piloto debe detenerse para adaptarlo, sin adivinar campos ni repetir búsquedas.
 
+El acceso se detecta por el enlace de cierre de sesión del portal y el buscador, incluso si el enlace está dentro de un menú o cambia su texto. Se revisan las pestañas de la ventana temporal por si el acceso abrió otra. CMD informa cada 15 segundos mientras espera. Si detecta acceso con un idioma de búsqueda aún no soportado, muestra ese motivo en lugar de seguir esperando. La sesión de tu navegador habitual no se comparte con la ventana del piloto.
+
 Para verificar dependencias y solicitud sin abrir el navegador:
 
 ```bat
