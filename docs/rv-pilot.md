@@ -60,6 +60,8 @@ PROBAR_RV_ONLINE.cmd --request "data\mi-prueba.json"
 - La lista puede mostrar importes redondeados. El conversor de moneda de cada tarifa expone el importe exacto; el piloto conserva sus centavos y rechaza importes ambiguos o monedas diferentes.
 - Cada habitación y plan tiene su tarifa y política. Consultar una política no valida el resto de opciones.
 - El formulario de traslados exige confirmar los dos selectores de hora. Puede devolver un horario diferente al solicitado o pendiente de determinar.
+- Cada horario tiene un botón para computadora y una copia oculta para móvil. El piloto selecciona solo los dos botones visibles y comprueba su cantidad antes de continuar. Esta corrección se cotejó en el navegador compartido con una consulta que devolvió opciones; falta confirmar la ejecución completa del programa actualizado en Windows.
+- CMD muestra cada paso de traslados. Ante un fallo, el JSON conserva `diagnostics` con el paso y una clasificación segura (`TIMEOUT` o `STEP_FAILED`), sin mensajes internos, URLs de sesión ni trazas del navegador. La ventana distingue una consulta parcial de un fallo total.
 - Una opción redonda puede combinar compartido y privado. El importe es por todos los pasajeros y ambos trayectos; no se duplica.
 - Hay productos cuyo nombre indica 18+ aunque la búsqueda incluya menores. El piloto los descarta; otras restricciones requieren revisión humana.
 - Existe exportación nativa de hoteles en PDF, abierta en otra pestaña. No es un endpoint de disponibilidad.

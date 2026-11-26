@@ -73,6 +73,22 @@ async function setTime(page, button, value) {
   await clickReadOnly(dialog.getByRole('button', exact('Confirm')));
 }
 
+export async function getTransferTimeButtons(panel) {
+  // Each journey has a desktop button AND a hidden mobile copy. Index only
+  // visible triggers, otherwise index 1 is the hidden outbound mobile button.
+  const buttons = panel.locator('button').filter({ has: panel.locator('input.hour-selector-text') }).filter({ visible: true });
+  if (await buttons.count() !== 2) throw new Error('No se encontraron exactamente dos selectores de hora visibles.');
+  return buttons;
+}
+
+export function describeTransferFailure(stage, error) {
+  // Playwright messages can contain supplier URLs, IDs and page text. Keep
+  // diagnostics useful without storing that raw message, stack or call log.
+  const code = error?.name === 'TimeoutError' ? 'TIMEOUT' : 'STEP_FAILED';
+  const reason = code === 'TIMEOUT' ? 'El control o resultado no estuvo disponible dentro del plazo.' : 'El paso no se completó o no superó la validación.';
+  return { service: 'transfer', stage, code, message: reason };
+}
+
 // Read only rendered result cards. Never extract cookies, credentials, option/cache IDs or full HTML.
 export async function readHotelRows(page) {
   return page.locator('article.hotel-result').evaluateAll(cards => cards.flatMap(card => {
@@ -174,36 +190,54 @@ export async function runRvPilot(request, { log = console.log, channel } = {}) {
         origin: request.trip.origin, meal: request.trip.meal, services: [...request.trip.services],
         rooms: request.trip.rooms.map(room=>({adults:room.adults,children:[...room.children]})) }, nationality: 'MX', hotelName: request.hotelName || null,
         outboundTime: request.outboundTime || null, returnTime: request.returnTime || null },
-      hotels, transfers: { offers: [], rejected: [] }, errors: [],
+      hotels, transfers: { offers: [], rejected: [] }, errors: [], diagnostics: [],
       limitations: ['No hay integración con el cotizador todavía.', 'No se validaron vuelos ni comisiones de la cuenta.', 'Revalidar antes de vender; no se realizaron reservas.'] };
     if (request.trip.services.includes('transfer')) {
       log('Consultando traslados redondos para el mismo hotel...');
+      let stage = 'abrir el buscador';
+      const step = value => { stage = value; log(`Traslados: ${stage}...`); };
       try {
+        step('abrir el buscador');
         await page.goto(RV_ORIGIN, { waitUntil: 'domcontentloaded' });
+        await page.locator('a[href*="action=logout" i]').first().waitFor({ state: 'attached' });
         await accessible(page);
         await clickReadOnly(page.getByRole('tab', exact('Transfers')));
         const transfers = page.getByRole('tabpanel', exact('Transfers'));
+        await transfers.waitFor({ state: 'visible' });
+        step('seleccionar aeropuerto y hotel');
         await transfers.getByRole('radio', exact('Round trip')).check();
         await chooseDestination(page, transfers, 'Origin', 'Cancun', /^\s*Cancun International Airport \(CUN\) Cancun, Quintana Roo, Mexico\s*$/);
         await chooseDestination(page, transfers, 'Destination', request.hotelName, new RegExp(escapeRegex(request.hotelName),'i'));
+        step('configurar pasajeros y fechas');
         await setGuests(page, transfers.getByRole('button', { name: /\d+ Guests/ }), request.trip.rooms[0]);
         await setDate(transfers.getByRole('textbox', exact('Departure More information')), request.trip.start);
         await setDate(transfers.getByRole('textbox', exact('Return More information')), request.trip.end);
         // Confirm BOTH pickers; the portal otherwise leaves Search without a response.
         // Use the visible time inputs to identify their containing buttons, not a remembered hour.
-        const timeButtons = transfers.locator('button').filter({ has: page.locator('input') });
+        step('configurar hora de ida');
+        const timeButtons = await getTransferTimeButtons(transfers);
         await setTime(page, timeButtons.nth(0), request.outboundTime);
+        step('configurar hora de regreso');
         await setTime(page, timeButtons.nth(1), request.returnTime);
+        step('enviar la consulta');
         await clickReadOnly(transfers.getByRole('button', exact('Search')));
-        await page.getByRole('heading', { name: /^Transfers in Cancun International Airport/, level: 1 }).first().waitFor();
+        await page.getByRole('heading', { name: /^Transfers in Cancun International Airport/, level: 1 }).first().waitFor({ timeout: searchTimeout });
+        step('validar ruta, fechas y pasajeros');
         verifySearchHeading(await page.getByRole('heading', { level: 1 }).first().innerText(), request, 'transfer');
+        step('esperar opciones del proveedor');
         await until(async()=> {
           await accessible(page);
           return await page.locator('article.transfer-result').count() > 0;
         }, searchTimeout, 'No se recibieron opciones de traslado en el plazo permitido.');
+        step('leer y validar las tarifas');
         report.transfers = normalizeTransfers(await readTransferRows(page), request);
+        if (!report.transfers.offers.length) throw new Error('Ninguna tarifa de traslado superó la validación.');
         log(`Traslados: ${report.transfers.offers.length} opciones capturadas; ${report.transfers.rejected.length} descartadas.`);
-      } catch { report.errors.push('No se completó la consulta de traslados. El piloto conservó las tarifas hoteleras; no añadió importes de ejemplo.'); }
+      } catch (error) {
+        const diagnostic = describeTransferFailure(stage, error);
+        report.diagnostics.push(diagnostic);
+        report.errors.push(`No se completó la consulta de traslados. Paso: ${stage} [${diagnostic.code}]. ${diagnostic.message} El piloto conservó las tarifas hoteleras; no añadió importes de ejemplo.`);
+      }
     }
     return report;
   } finally { await browser.close(); }

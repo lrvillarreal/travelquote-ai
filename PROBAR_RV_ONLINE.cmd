@@ -15,11 +15,19 @@ echo Preparando las dependencias del piloto...
 call npm.cmd ci --ignore-scripts --no-audit --no-fund
 if errorlevel 1 goto :failed
 node scripts\rv-pilot.mjs %*
+if errorlevel 3 goto :failed
+if errorlevel 2 goto :partial
 if errorlevel 1 goto :failed
 echo.
 echo Consulta terminada. El resultado aparece en la carpeta data\rv-pilot.
 pause
 exit /b 0
+:partial
+echo.
+echo Consulta parcial: se conservaron los hoteles. Los traslados siguen pendientes.
+echo Revisa arriba el paso que fallo y el resultado en data\rv-pilot.
+pause
+exit /b 2
 :node_missing
 echo Se necesita Node.js 24 o posterior desde https://nodejs.org/.
 :failed
