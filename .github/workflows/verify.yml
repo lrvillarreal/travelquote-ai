@@ -19,6 +19,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Domain and integration tests
         run: npm test
+      - name: RV pilot dependency and request check
+        run: npm run rv:check
       - name: Typecheck and production build
         run: npm run build
       - name: Preserve built frontend and lockfile
